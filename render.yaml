@@ -3,5 +3,3 @@ services:
     name: iptv-proxy
     env: docker
     plan: free
-    autoDeploy: true
-    region: oregon
