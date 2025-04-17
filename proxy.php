@@ -1,44 +1,56 @@
 <?php
-// التحقق من وجود رابط مشفر
+// السماح بالوصول من أي مصدر
+header("Access-Control-Allow-Origin: *");
+
+// التحقق من وجود الرابط المشفر
 if (!isset($_GET['url'])) {
     http_response_code(400);
-    die("❌ مفقود الرابط (url)");
+    die("Missing URL");
 }
 
-// فك تشفير الرابط
-$url = base64_decode($_GET['url']);
+// فك تشفير الرابط من base64
+$decoded_url = base64_decode($_GET['url']);
 
-// رؤوس http مهمة جدًا لتجاوز الحماية
-$headers = [
-    "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36",
-    "Referer: https://google.com",
-    "Origin: https://google.com",
-    "Accept: */*"
-];
+// التحقق من أن الرابط يبدأ بـ http
+if (!preg_match('/^https?:\/\//', $decoded_url)) {
+    http_response_code(400);
+    die("Invalid URL");
+}
 
-// إعداد CURL
+// إعداد الطلب بـ cURL
 $ch = curl_init();
-curl_setopt($ch, CURLOPT_URL, $url);
-curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+curl_setopt($ch, CURLOPT_URL, $decoded_url);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // مهم لإعادة التوجيه
-curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // لتجاوز SSL errors
-curl_setopt($ch, CURLOPT_HEADER, false);
+curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
 
-// تنفيذ الطلب
+// ترويسات وهمية لتخطي الحماية
+curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+    "Referer: $decoded_url",
+    "Origin: *"
+]);
+
+// نوع المحتوى حسب امتداد الملف
+$ext = pathinfo(parse_url($decoded_url, PHP_URL_PATH), PATHINFO_EXTENSION);
+$content_types = [
+    "m3u8" => "application/vnd.apple.mpegurl",
+    "ts"   => "video/mp2t",
+];
+if (isset($content_types[$ext])) {
+    header("Content-Type: " . $content_types[$ext]);
+} else {
+    header("Content-Type: application/octet-stream");
+}
+
+// تنفيذ الطلب وإظهار النتيجة
 $response = curl_exec($ch);
-$contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE) ?: "application/vnd.apple.mpegurl";
-$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+$http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 curl_close($ch);
 
-// إعادة التوجيه للرأس الصحيح
-header("Access-Control-Allow-Origin: *");
-header("Content-Type: " . $contentType);
-
-// عرض النتيجة
-if ($httpCode === 200) {
+// إرسال النتيجة أو الخطأ
+if ($http_code == 200 && $response !== false) {
     echo $response;
 } else {
-    http_response_code($httpCode);
-    echo "⚠️ تعذر جلب البث. (رمز: $httpCode)";
+    http_response_code($http_code);
+    echo "Error fetching the stream.";
 }
