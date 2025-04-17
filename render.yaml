@@ -3,3 +3,7 @@ services:
     name: iptv-proxy
     env: docker
     plan: free
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    buildCommand: ""
+    startCommand: "apache2-foreground"
