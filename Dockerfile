@@ -1,5 +1,12 @@
-FROM php:8.2-cli
-WORKDIR /app
-COPY . .
+FROM php:8.1-apache
+
+# نسخ الملفات إلى مجلد الموقع
+COPY . /var/www/html/
+
+# تفعيل mod_rewrite
+RUN a2enmod rewrite
+
+# تعيين صلاحيات الملفات
+RUN chown -R www-data:www-data /var/www/html
+
 EXPOSE 80
-CMD ["php", "-S", "0.0.0.0:80", "proxy.php"]
